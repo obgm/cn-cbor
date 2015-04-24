@@ -160,9 +160,9 @@ CTEST(cbor, parse_normalize)
     unsigned char encoded[1024];
     ssize_t enc_sz;
 
-    for (i=0; i<sizeof(tests)/sizeof(char*); ) {
-        ASSERT_TRUE(parse_hex(tests[i++], &b));
-        ASSERT_TRUE(parse_hex(tests[i++], &b2));
+    for (i=0; i<sizeof(tests)/sizeof(char*); i+=2) {
+        ASSERT_TRUE(parse_hex(tests[i], &b));
+        ASSERT_TRUE(parse_hex(tests[i+1], &b2));
         err.err = CN_CBOR_NO_ERROR;
         cb = cn_cbor_decode(b.ptr, b.sz CONTEXT_NULL, &err);
         CTEST_LOG("%s: %s", tests[i], cn_cbor_error_str[err.err]);

@@ -394,6 +394,19 @@ bool cn_cbor_array_append(cn_cbor* cb_array,
                           cn_cbor* cb_value,
                           cn_cbor_errback *errp);
 
+/**
+ * Output a CBOR structure specified by given @p format string.
+ *
+ * @param[in]  CBOR_CONTEXT Allocation context (only if USE_CBOR_CONTEXT is defined)
+ * @param[in]  buf          The buffer into which to write
+ * @param[in]  buf_size     The total length (in bytes) of the buffer
+ * @param[in]  format       The format string that specifies the structure of the
+ *                          CBOR object that is output.
+ * @return                  -1 on fail, or number of bytes written
+ */
+ssize_t cn_cbor_pack(CBOR_CONTEXT_COMMA uint8_t *buf, size_t buf_size,
+                     const char *format, ...);
+
 #ifdef  __cplusplus
 }
 #endif

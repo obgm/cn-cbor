@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 #include <arpa/inet.h>
+#include <stdarg.h>
 #include <string.h>
 #include <strings.h>
 #include <stdbool.h>
@@ -300,6 +301,101 @@ ssize_t cn_cbor_encoder_write(uint8_t *buf,
   _visit(cb, _encoder_visitor, _encoder_breaker, &ws);
   if (ws.offset < 0) { return -1; }
   return ws.offset - buf_offset;
+}
+#include <stdio.h>
+struct parse_buf {
+  unsigned char *buf;
+  unsigned char *ebuf;
+  cn_cbor_error err;
+};
+
+#define CN_CBOR_FAIL(code) do { pb.err = code;  goto fail; } while(0)
+#define TAKE(pos, ebuf, n, stmt)                \
+  if (n > (size_t)(ebuf - pos))                 \
+    CN_CBOR_FAIL(CN_CBOR_ERR_OUT_OF_DATA);      \
+  stmt;                                         \
+  pos += n;
+
+static inline void
+emit_text(cn_write_state *ws, const unsigned char *start, ssize_t length, int scan __attribute__((unused))) {
+  if (start && length) {
+    fprintf(stderr, "[emit %p, %d]\n", start, (int)length);
+    CHECK(_write_positive(ws, CN_CBOR_TEXT, (uint64_t)length));
+    ensure_writable(length);
+    memcpy(ws->buf+ws->offset, start, length);
+    ws->offset += length;
+  }
+}
+
+ssize_t cn_cbor_pack(uint8_t *buf,
+                     size_t buf_size,
+                     const char *format,
+                     ...)
+{
+  va_list ap;
+  cn_write_state ws = { buf, 0, buf_size };
+  struct parse_buf pb = { (unsigned char *)format, (unsigned char *)format + strlen(format) + 1, 0 };
+  const unsigned char *tstart, *tend;
+  int tscan = 0; /* set to 1 if text to be emitted needs to be scanned for %% */
+  char c;
+
+  va_start(ap, format);
+
+  tstart = NULL;
+
+  while(*pb.buf) {
+    if (!tstart)
+      tstart = tend = pb.buf;
+
+    TAKE(pb.buf, pb.ebuf, 1, c = *(pb.buf));
+
+    if (c == '%') {
+      TAKE(pb.buf, pb.ebuf, 1, c = *(pb.buf));
+
+      switch(c) {
+      case 's': { /* output collected text object, new text object */
+        char *s;
+        emit_text(&ws, tstart, (tend - tstart), tscan);
+        tstart = NULL;
+
+        s = va_arg(ap, char *);
+        emit_text(&ws, (unsigned char *)s, strlen(s), 0);
+        break;
+      }
+      case 'd': {              /* int */
+        int d;
+        emit_text(&ws, tstart, tend - tstart, 0);
+        tstart = NULL;
+
+        d = va_arg(ap, int);
+
+        _write_positive(&ws, CN_CBOR_INT, d);
+        break;
+      }
+      case '%': tscan = 1;
+      default:
+        tend = pb.buf;
+      }
+    } else {
+      tend = pb.buf;
+    }
+  }
+
+  emit_text(&ws, tstart, tend - tstart, 0);
+
+  va_end(ap);
+
+  if (ws.offset < 0) {
+    fprintf(stderr, "err\n");
+  }
+
+  return ws.offset;
+
+ fail:
+
+  va_end(ap);
+
+  return ws.offset;
 }
 
 #ifdef  __cplusplus

@@ -35,3 +35,7 @@ if (APPLE)
     COMMENT "generate differences between actual and expected output")
 
 endif()
+
+add_executable (pack-test pack-test.c )
+target_include_directories ( pack-test PRIVATE ../include )
+target_link_libraries ( pack-test PRIVATE cn-cbor )
